@@ -1,6 +1,16 @@
 #[cfg(feature = "buddy-alloc")]
 mod alloc;
+
+mod game;
 mod wasm4;
+
+#[macro_use]
+extern crate lazy_static;
+
+use game::Game;
+use std::sync::Mutex;
+
+lazy_static! { static ref GAME: Mutex<Game> = Mutex::new(Game::new()); }
 
 #[no_mangle]
 fn start() {
@@ -9,11 +19,5 @@ fn start() {
 
 #[no_mangle]
 fn update() {
-    // Testing palette, remove later
-    unsafe { *wasm4::DRAW_COLORS = 2; }
-    wasm4::rect(0, 0, 60, 60);
-    unsafe { *wasm4::DRAW_COLORS = 3; }
-    wasm4::rect(61, 61, 60, 60);
-    unsafe { *wasm4::DRAW_COLORS = 4; }
-    wasm4::rect(61, 0, 60, 60);
+    GAME.lock().expect("game state").update();
 }
