@@ -27,6 +27,34 @@ struct Sprite {
     sprite: Vec<u8>,
 }
 
+impl Sprite {
+    /// Moves the sprite on the x-axis by amt (amt < 0 is left, amt > 0 is right)
+    fn move_x(&mut self, amt: i32) {
+        self.pos.x += amt;
+        if self.pos.x < 0 {
+            self.pos.x = 0;
+        } else {
+            let upper_limit = 160 - self.width as i32;
+            if self.pos.x > upper_limit {
+                self.pos.x = upper_limit;
+            }
+        }
+    }
+
+    /// Moves the sprite on the y-axis by amt (amt < 0 is up, amt > 0 is down)
+    fn move_y(&mut self, amt: i32) {
+        self.pos.y += amt;
+        if self.pos.y < 0 {
+            self.pos.y = 0;
+        } else {
+            let upper_limit = 160 - self.height as i32;
+            if self.pos.y > upper_limit {
+                self.pos.y = upper_limit;
+            }
+        }
+    }
+}
+
 impl Drawable for Sprite {
     fn draw(&self) {
         wasm4::blit(
@@ -50,13 +78,31 @@ impl Game {
                 height: 16,
                 flags: wasm4::BLIT_2BPP,
                 sprite: sprites::TEST_PLAYER.to_vec(),
-                // TODO: put sprite arrays in a seperate file
-            }
+            },
         }
     }
 
     /// Updates game state, draws required items.
-    pub fn update(&self) {
+    pub fn update(&mut self) {
+        self.handle_input();
         self.player.draw();
+    }
+
+    /// Takes required actions depending on state of gamepad
+    fn handle_input(&mut self) {
+        let gamepad = unsafe { *wasm4::GAMEPAD1 };
+
+        if gamepad & wasm4::BUTTON_UP != 0 {
+            self.player.move_y(-1);
+        }
+        if gamepad & wasm4::BUTTON_DOWN != 0 {
+            self.player.move_y(1);
+        }
+        if gamepad & wasm4::BUTTON_LEFT != 0 {
+            self.player.move_x(-1);
+        }
+        if gamepad & wasm4::BUTTON_RIGHT != 0 {
+            self.player.move_x(1);
+        }
     }
 }
