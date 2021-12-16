@@ -1,5 +1,5 @@
 [package]
-name = "purple_land"
+name = "cart"
 version = "0.1.0"
 edition = "2021"
 description = "WIP Wasm4 game"
