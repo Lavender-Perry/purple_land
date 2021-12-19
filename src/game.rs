@@ -46,6 +46,25 @@ impl ScreenRegion {
         }
         return true;
     }
+
+    /// Returns if self overlaps sr (another ScreenRegion)
+    fn overlaps(&self, sr: &ScreenRegion) -> bool {
+        let x_diff = self.pos.x - sr.pos.x;
+        let x_overlaps = if x_diff >= 0 {
+            x_diff <= sr.width as i32
+        } else {
+            x_diff > -(self.width as i32)
+        };
+
+        let y_diff = self.pos.y - sr.pos.y;
+        let y_overlaps = if y_diff >= 0 {
+            y_diff <= sr.height as i32
+        } else {
+            y_diff > -(self.height as i32)
+        };
+
+        x_overlaps && y_overlaps
+    }
 }
 
 trait Drawable {
@@ -192,6 +211,11 @@ impl Game {
                 self.projectiles.swap_remove(i);
                 continue;
             }
+            if self.projectiles[i].screen_region.overlaps(&self.player.screen_region) {
+                *self = Game::new();
+                return;
+            }
+
             self.projectiles[i].draw();
             i += 1;
         }
