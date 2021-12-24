@@ -1,6 +1,7 @@
 mod sprites;
-
 use crate::wasm4;
+use rand::prelude::*;
+use rand_pcg::Pcg64;
 
 #[derive(Clone, Copy)]
 struct Point {
@@ -8,6 +9,7 @@ struct Point {
     y: i32,
 }
 
+#[derive(Clone, Copy)]
 struct ScreenRegion {
     pos: Point,
     width: u32,
@@ -99,21 +101,11 @@ struct Projectile {
 }
 
 impl Projectile {
-    fn new(
-        direction: Point,
-        pos: Point,
-        width: Option<u32>,
-        height: Option<u32>,
-        max_bounces: Option<u32>,
-    ) -> Self {
+    fn new(screen_region: ScreenRegion, direction: Point, max_bounces: u32) -> Self {
         Self {
-            screen_region: ScreenRegion {
-                pos,
-                width: width.unwrap_or(3),
-                height: height.unwrap_or(3),
-            },
+            screen_region,
             direction,
-            max_bounces: max_bounces.unwrap_or(3),
+            max_bounces,
             bounce_amount: 0,
         }
     }
@@ -151,6 +143,7 @@ pub struct Game {
     player: Sprite,
     projectiles: Vec<Projectile>,
     frame_count: usize,
+    rng: Pcg64,
 }
 
 impl Game {
@@ -165,37 +158,9 @@ impl Game {
                 flags: wasm4::BLIT_2BPP,
                 sprite: sprites::TEST_PLAYER.to_vec(),
             },
-            projectiles: vec![
-                Projectile::new(
-                    Point { x: 1, y: 1 },
-                    Point { x: 81, y: 81 },
-                    None,
-                    None,
-                    None,
-                ),
-                Projectile::new(
-                    Point { x: 1, y: -1 },
-                    Point { x: 81, y: 80 },
-                    None,
-                    None,
-                    None,
-                ),
-                Projectile::new(
-                    Point { x: -1, y: 1 },
-                    Point { x: 80, y: 81 },
-                    None,
-                    None,
-                    None,
-                ),
-                Projectile::new(
-                    Point { x: -1, y: -1 },
-                    Point { x: 80, y: 80 },
-                    None,
-                    None,
-                    None,
-                ),
-            ],
+            projectiles: Vec::new(),
             frame_count: 0,
+            rng: Pcg64::seed_from_u64(69420),
         }
     }
 
@@ -204,6 +169,41 @@ impl Game {
         self.frame_count += 1;
 
         self.handle_input();
+
+        if self.frame_count % 60 == 0 {
+            let mut screen_region = self.player.screen_region;
+            while screen_region.overlaps(&self.player.screen_region) {
+                let width = self.rng.gen_range(1..10);
+                let height = self.rng.gen_range(1..10);
+                screen_region = ScreenRegion {
+                    pos: Point {
+                        x: self.rng.gen_range(0..160 - width),
+                        y: self.rng.gen_range(0..160 - height),
+                    },
+                    width: width as u32,
+                    height: height as u32,
+                };
+            }
+
+            let x = self.rng.gen_range(-2..2);
+
+            self.projectiles.push(Projectile::new(
+                screen_region,
+                Point {
+                    x,
+                    y: if x == 0 {
+                        if self.rng.gen() {
+                            self.rng.gen_range(1..2)
+                        } else {
+                            self.rng.gen_range(-2..-1)
+                        }
+                    } else {
+                        self.rng.gen_range(-2..2)
+                    },
+                },
+                self.rng.gen_range(0..5),
+            ));
+        }
 
         let mut i = 0;
         while i < self.projectiles.len() {
