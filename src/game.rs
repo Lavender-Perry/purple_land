@@ -211,7 +211,10 @@ impl Game {
                 self.projectiles.swap_remove(i);
                 continue;
             }
-            if self.projectiles[i].screen_region.overlaps(&self.player.screen_region) {
+            if self.projectiles[i]
+                .screen_region
+                .overlaps(&self.player.screen_region)
+            {
                 *self = Game::new();
                 return;
             }
