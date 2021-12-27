@@ -10,13 +10,13 @@ struct Point {
 }
 
 #[derive(Clone, Copy)]
-struct ScreenRegion {
+struct Area {
     pos: Point,
     width: u32,
     height: u32,
 }
 
-impl ScreenRegion {
+impl Area {
     /// Moves the object on the x-axis by amt (amt < 0 is left, amt > 0 is right).
     /// Returns true if the object was moved, false if it is collided with something.
     fn move_x(&mut self, amt: i32) -> bool {
@@ -49,8 +49,8 @@ impl ScreenRegion {
         return true;
     }
 
-    /// Returns if self overlaps sr (another ScreenRegion)
-    fn overlaps(&self, sr: &ScreenRegion) -> bool {
+    /// Returns if self overlaps sr (another Area)
+    fn overlaps(&self, sr: &Area) -> bool {
         let x_diff = self.pos.x - sr.pos.x;
         let x_overlaps = if x_diff >= 0 {
             x_diff <= sr.width as i32
@@ -75,7 +75,7 @@ trait Drawable {
 }
 
 struct Sprite {
-    screen_region: ScreenRegion,
+    area: Area,
     flags: u32,
     sprite: Vec<u8>,
 }
@@ -84,26 +84,63 @@ impl Drawable for Sprite {
     fn draw(&self) {
         wasm4::blit(
             &self.sprite,
-            self.screen_region.pos.x,
-            self.screen_region.pos.y,
-            self.screen_region.width,
-            self.screen_region.height,
+            self.area.pos.x,
+            self.area.pos.y,
+            self.area.width,
+            self.area.height,
             self.flags,
         );
     }
 }
 
+struct Textbox {
+    area: Area,
+    text: String,
+}
+
+impl Textbox {
+    fn new(text: String) -> Self {
+        Self {
+            area: Area {
+                pos: Point { x: 0, y: 130 },
+                width: 160,
+                height: 30,
+            },
+            text,
+        }
+    }
+}
+
+impl Drawable for Textbox {
+    fn draw(&self) {
+        let prev_draw_colors = unsafe { *wasm4::DRAW_COLORS };
+        unsafe {
+            *wasm4::DRAW_COLORS = 0x42;
+        }
+        wasm4::rect(
+            self.area.pos.x,
+            self.area.pos.y,
+            self.area.width,
+            self.area.height,
+        );
+        wasm4::text(&self.text, self.area.pos.x, self.area.pos.y);
+        unsafe {
+            *wasm4::DRAW_COLORS = prev_draw_colors;
+        }
+    }
+}
+
 struct Projectile {
-    screen_region: ScreenRegion,
+    area: Area,
     direction: Point,
     max_bounces: u32,
     bounce_amount: u32,
 }
 
 impl Projectile {
-    fn new(screen_region: ScreenRegion, direction: Point, max_bounces: u32) -> Self {
+    fn new(area: Area, direction: Point, max_bounces: u32) -> Self {
         Self {
-            screen_region,
+            area,
             direction,
             max_bounces,
             bounce_amount: 0,
@@ -114,12 +151,12 @@ impl Projectile {
     /// Returns if it has reached max bounces.
     fn update(&mut self) -> bool {
         // Move x if needed, update direction & bounce amount if it bounced.
-        if self.direction.x != 0 && !self.screen_region.move_x(self.direction.x) {
+        if self.direction.x != 0 && !self.area.move_x(self.direction.x) {
             self.direction.x = -self.direction.x;
             self.bounce_amount += 1;
         }
         // Move y if needed, update direction & bounce amount if it bounced.
-        if self.direction.y != 0 && !self.screen_region.move_y(self.direction.y) {
+        if self.direction.y != 0 && !self.area.move_y(self.direction.y) {
             self.direction.y = -self.direction.y;
             self.bounce_amount += 1;
         }
@@ -131,16 +168,17 @@ impl Projectile {
 impl Drawable for Projectile {
     fn draw(&self) {
         wasm4::rect(
-            self.screen_region.pos.x,
-            self.screen_region.pos.y,
-            self.screen_region.width,
-            self.screen_region.height,
+            self.area.pos.x,
+            self.area.pos.y,
+            self.area.width,
+            self.area.height,
         );
     }
 }
 
 pub struct Game {
     player: Sprite,
+    current_textbox: Textbox,
     projectiles: Vec<Projectile>,
     frame_count: usize,
     rng: Pcg64,
@@ -150,7 +188,7 @@ impl Game {
     pub fn new() -> Self {
         Self {
             player: Sprite {
-                screen_region: ScreenRegion {
+                area: Area {
                     pos: Point { x: 0, y: 0 },
                     width: 16,
                     height: 16,
@@ -158,6 +196,7 @@ impl Game {
                 flags: wasm4::BLIT_2BPP,
                 sprite: sprites::TEST_PLAYER.to_vec(),
             },
+            current_textbox: Textbox::new("Hello, this is a text box".to_string()),
             projectiles: Vec::new(),
             frame_count: 0,
             rng: Pcg64::seed_from_u64(69420),
@@ -171,11 +210,11 @@ impl Game {
         self.handle_input();
 
         if self.frame_count % 60 == 0 {
-            let mut screen_region = self.player.screen_region;
-            while screen_region.overlaps(&self.player.screen_region) {
+            let mut area = self.player.area;
+            while area.overlaps(&self.player.area) {
                 let width = self.rng.gen_range(1..10);
                 let height = self.rng.gen_range(1..10);
-                screen_region = ScreenRegion {
+                area = Area {
                     pos: Point {
                         x: self.rng.gen_range(0..160 - width),
                         y: self.rng.gen_range(0..160 - height),
@@ -188,7 +227,7 @@ impl Game {
             let x = self.rng.gen_range(-2..2);
 
             self.projectiles.push(Projectile::new(
-                screen_region,
+                area,
                 Point {
                     x,
                     y: if x == 0 {
@@ -211,10 +250,7 @@ impl Game {
                 self.projectiles.swap_remove(i);
                 continue;
             }
-            if self.projectiles[i]
-                .screen_region
-                .overlaps(&self.player.screen_region)
-            {
+            if self.projectiles[i].area.overlaps(&self.player.area) {
                 *self = Game::new();
                 return;
             }
@@ -223,6 +259,7 @@ impl Game {
             i += 1;
         }
 
+        self.current_textbox.draw();
         self.player.draw();
     }
 
@@ -231,16 +268,16 @@ impl Game {
         let gamepad = unsafe { *wasm4::GAMEPAD1 };
 
         if gamepad & wasm4::BUTTON_UP != 0 {
-            self.player.screen_region.move_y(-1);
+            self.player.area.move_y(-1);
         }
         if gamepad & wasm4::BUTTON_DOWN != 0 {
-            self.player.screen_region.move_y(1);
+            self.player.area.move_y(1);
         }
         if gamepad & wasm4::BUTTON_LEFT != 0 {
-            self.player.screen_region.move_x(-1);
+            self.player.area.move_x(-1);
         }
         if gamepad & wasm4::BUTTON_RIGHT != 0 {
-            self.player.screen_region.move_x(1);
+            self.player.area.move_x(1);
         }
     }
 }
