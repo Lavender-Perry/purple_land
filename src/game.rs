@@ -93,52 +93,15 @@ impl Drawable for Sprite {
     }
 }
 
-struct Textbox {
-    area: Area,
-    text: String,
-}
-
-impl Textbox {
-    fn new(text: String) -> Self {
-        Self {
-            area: Area {
-                pos: Point { x: 0, y: 130 },
-                width: 160,
-                height: 30,
-            },
-            text,
-        }
-    }
-}
-
-impl Drawable for Textbox {
-    fn draw(&self) {
-        let prev_draw_colors = unsafe { *wasm4::DRAW_COLORS };
-        unsafe {
-            *wasm4::DRAW_COLORS = 0x42;
-        }
-        wasm4::rect(
-            self.area.pos.x,
-            self.area.pos.y,
-            self.area.width,
-            self.area.height,
-        );
-        wasm4::text(&self.text, self.area.pos.x, self.area.pos.y);
-        unsafe {
-            *wasm4::DRAW_COLORS = prev_draw_colors;
-        }
-    }
-}
-
 struct Projectile {
     area: Area,
     direction: Point,
-    max_bounces: u32,
-    bounce_amount: u32,
+    max_bounces: usize,
+    bounce_amount: usize,
 }
 
 impl Projectile {
-    fn new(area: Area, direction: Point, max_bounces: u32) -> Self {
+    fn new(area: Area, direction: Point, max_bounces: usize) -> Self {
         Self {
             area,
             direction,
@@ -178,7 +141,7 @@ impl Drawable for Projectile {
 
 pub struct Game {
     player: Sprite,
-    current_textbox: Textbox,
+    score: usize,
     projectiles: Vec<Projectile>,
     frame_count: usize,
     rng: Pcg64,
@@ -196,7 +159,7 @@ impl Game {
                 flags: wasm4::BLIT_2BPP,
                 sprite: sprites::TEST_PLAYER.to_vec(),
             },
-            current_textbox: Textbox::new("Hello, this is a text box".to_string()),
+            score: 0,
             projectiles: Vec::new(),
             frame_count: 0,
             rng: Pcg64::seed_from_u64(69420),
@@ -242,6 +205,8 @@ impl Game {
                 },
                 self.rng.gen_range(0..5),
             ));
+
+            self.score += 1;
         }
 
         let mut i = 0;
@@ -259,7 +224,15 @@ impl Game {
             i += 1;
         }
 
-        self.current_textbox.draw();
+        let prev_draw_colors = unsafe { *wasm4::DRAW_COLORS };
+        unsafe {
+            *wasm4::DRAW_COLORS = 0x42;
+        }
+        wasm4::text(&self.score.to_string(), 0, 0);
+        unsafe {
+            *wasm4::DRAW_COLORS = prev_draw_colors;
+        }
+
         self.player.draw();
     }
 
