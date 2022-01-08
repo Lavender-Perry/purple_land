@@ -1,4 +1,3 @@
-mod sprites;
 use crate::wasm4;
 use rand::prelude::*;
 use rand_pcg::Pcg64;
@@ -67,29 +66,10 @@ impl Area {
 
         x_overlaps && y_overlaps
     }
-}
 
-trait Drawable {
-    /// Draws the object to the screen
-    fn draw(&self);
-}
-
-struct Sprite {
-    area: Area,
-    flags: u32,
-    sprite: Vec<u8>,
-}
-
-impl Drawable for Sprite {
+    /// Draws the area to the screen as a rectangle
     fn draw(&self) {
-        wasm4::blit(
-            &self.sprite,
-            self.area.pos.x,
-            self.area.pos.y,
-            self.area.width,
-            self.area.height,
-            self.flags,
-        );
+        wasm4::rect(self.pos.x, self.pos.y, self.width, self.height);
     }
 }
 
@@ -128,19 +108,8 @@ impl Projectile {
     }
 }
 
-impl Drawable for Projectile {
-    fn draw(&self) {
-        wasm4::rect(
-            self.area.pos.x,
-            self.area.pos.y,
-            self.area.width,
-            self.area.height,
-        );
-    }
-}
-
 pub struct Game {
-    player: Sprite,
+    player: Area,
     score: usize,
     projectiles: Vec<Projectile>,
     frame_count: usize,
@@ -150,14 +119,10 @@ pub struct Game {
 impl Game {
     pub fn new() -> Self {
         Self {
-            player: Sprite {
-                area: Area {
-                    pos: Point { x: 0, y: 0 },
-                    width: 16,
-                    height: 16,
-                },
-                flags: wasm4::BLIT_2BPP,
-                sprite: sprites::TEST_PLAYER.to_vec(),
+            player: Area {
+                pos: Point { x: 69, y: 69 },
+                width: 16,
+                height: 16,
             },
             score: 0,
             projectiles: Vec::new(),
@@ -173,8 +138,8 @@ impl Game {
         self.handle_input();
 
         if self.frame_count % 60 == 0 {
-            let mut area = self.player.area;
-            while area.overlaps(&self.player.area) {
+            let mut area = self.player;
+            while area.overlaps(&self.player) {
                 let width = self.rng.gen_range(1..10);
                 let height = self.rng.gen_range(1..10);
                 area = Area {
@@ -215,12 +180,12 @@ impl Game {
                 self.projectiles.swap_remove(i);
                 continue;
             }
-            if self.projectiles[i].area.overlaps(&self.player.area) {
+            if self.projectiles[i].area.overlaps(&self.player) {
                 *self = Game::new();
                 return;
             }
 
-            self.projectiles[i].draw();
+            self.projectiles[i].area.draw();
             i += 1;
         }
 
@@ -228,12 +193,13 @@ impl Game {
         unsafe {
             *wasm4::DRAW_COLORS = 0x42;
         }
+        // Draw score
         wasm4::text(&self.score.to_string(), 0, 0);
+        // Draw player
+        self.player.draw();
         unsafe {
             *wasm4::DRAW_COLORS = prev_draw_colors;
-        }
-
-        self.player.draw();
+        };
     }
 
     /// Takes required actions depending on state of gamepad
@@ -241,16 +207,16 @@ impl Game {
         let gamepad = unsafe { *wasm4::GAMEPAD1 };
 
         if gamepad & wasm4::BUTTON_UP != 0 {
-            self.player.area.move_y(-1);
+            self.player.move_y(-1);
         }
         if gamepad & wasm4::BUTTON_DOWN != 0 {
-            self.player.area.move_y(1);
+            self.player.move_y(1);
         }
         if gamepad & wasm4::BUTTON_LEFT != 0 {
-            self.player.area.move_x(-1);
+            self.player.move_x(-1);
         }
         if gamepad & wasm4::BUTTON_RIGHT != 0 {
-            self.player.area.move_x(1);
+            self.player.move_x(1);
         }
     }
 }
