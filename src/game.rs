@@ -110,14 +110,27 @@ impl Projectile {
 
 pub struct Game {
     player: Area,
-    score: usize,
+    score: u8,
+    high_score: u8,
     projectiles: Vec<Projectile>,
     frame_count: usize,
     rng: Pcg64,
+    over: bool,
+    restart: bool,
 }
 
 impl Game {
     pub fn new() -> Self {
+        let high_score = unsafe {
+            let mut buf = [0u8; 1];
+            let read_amt = wasm4::diskr(buf.as_mut_ptr(), 1);
+            if read_amt < 1 {
+                0
+            } else {
+                u8::from_le_bytes(buf)
+            }
+        };
+
         Self {
             player: Area {
                 pos: Point { x: 69, y: 69 },
@@ -125,14 +138,43 @@ impl Game {
                 height: 16,
             },
             score: 0,
+            high_score,
             projectiles: Vec::new(),
             frame_count: 0,
             rng: Pcg64::seed_from_u64(69420),
+            over: false,
+            restart: false,
         }
     }
 
     /// Updates game state, draws required items.
     pub fn update(&mut self) {
+        if self.over {
+            if self.score > self.high_score {
+                self.high_score = self.score;
+                unsafe { wasm4::diskw(self.score.to_le_bytes().as_ptr(), 1); }
+            }
+
+            wasm4::text(
+                format!(
+                    "Your score: {}\nHigh score: {}\nPress any button\nto restart.",
+                    self.score,
+                    self.high_score
+                ),
+                20, 20
+            );
+
+            if unsafe { *wasm4::GAMEPAD1 } == 0 {
+                if !self.restart {
+                    self.restart = true;
+                }
+            } else if self.restart {
+                *self = Game::new();
+            }
+
+            return;
+        }
+
         self.frame_count += 1;
 
         self.handle_input();
@@ -180,8 +222,9 @@ impl Game {
                 self.projectiles.swap_remove(i);
                 continue;
             }
-            if self.projectiles[i].area.overlaps(&self.player) {
-                *self = Game::new();
+
+            if self.projectiles[i].area.overlaps(&self.player) { // Game over
+                self.over = true;
                 return;
             }
 
@@ -193,13 +236,15 @@ impl Game {
         unsafe {
             *wasm4::DRAW_COLORS = 0x42;
         }
+
         // Draw score
         wasm4::text(&self.score.to_string(), 0, 0);
         // Draw player
         self.player.draw();
+
         unsafe {
             *wasm4::DRAW_COLORS = prev_draw_colors;
-        };
+        }
     }
 
     /// Takes required actions depending on state of gamepad

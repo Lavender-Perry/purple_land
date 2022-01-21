@@ -1,8 +1,8 @@
 [package]
 name = "cart"
-version = "0.1.0"
+version = "2022.1.21"
 edition = "2021"
-description = "WIP Wasm4 game"
+description = "Purple Land game made with Wasm4"
 license = "CNPL-NAv7+"
 authors = ["Lavender Perry <endie2@protonmail.com>"]
 keywords = ["game", "wasm4"]
