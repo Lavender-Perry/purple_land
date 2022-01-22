@@ -2,7 +2,7 @@
 name = "cart"
 version = "2022.1.21"
 edition = "2021"
-description = "Purple Land game made with Wasm4"
+description = "Purple Land game made for WASM-4"
 license = "CNPL-NAv7+"
 authors = ["Lavender Perry <endie2@protonmail.com>"]
 keywords = ["game", "wasm4"]
@@ -22,6 +22,7 @@ rand_pcg = "0.3.1"
 [profile.release]
 opt-level = "z"
 lto = true
+debug = true
 
 [features]
 # use `--no-default-features` or comment out next line to disable allocator

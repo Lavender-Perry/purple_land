@@ -150,19 +150,23 @@ impl Game {
     /// Updates game state, draws required items.
     pub fn update(&mut self) {
         if self.over {
+            // Do game over screen
             if self.score > self.high_score {
+                // Update high score
                 self.high_score = self.score;
-                unsafe { wasm4::diskw(self.score.to_le_bytes().as_ptr(), 1); }
+                unsafe {
+                    wasm4::diskw(self.score.to_le_bytes().as_ptr(), 1);
+                }
             }
 
+            // Not using format!() here to reduce cart size
             wasm4::text(
-                format!(
-                    "Your score: {}\nHigh score: {}\nPress any button\nto restart.",
-                    self.score,
-                    self.high_score
-                ),
-                20, 20
+                "Your score:\nHigh score:\nPress a button\nto restart",
+                20,
+                20,
             );
+            wasm4::text(&self.score.to_string(), 110, 20);
+            wasm4::text(&self.high_score.to_string(), 110, 28);
 
             if unsafe { *wasm4::GAMEPAD1 } == 0 {
                 if !self.restart {
@@ -223,7 +227,8 @@ impl Game {
                 continue;
             }
 
-            if self.projectiles[i].area.overlaps(&self.player) { // Game over
+            if self.projectiles[i].area.overlaps(&self.player) {
+                // Game over
                 self.over = true;
                 return;
             }
