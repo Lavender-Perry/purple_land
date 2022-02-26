@@ -1,11 +1,11 @@
+use crate::wasm4;
 use rand::prelude::*;
 use rand_pcg::Pcg64;
-use crate::wasm4;
 
-mod projectile;
 mod basics;
-use self::projectile::Projectile;
+mod projectile;
 use self::basics::{Point, Square};
+use self::projectile::Projectile;
 
 const PLAYER_SIZE: u32 = 16;
 
@@ -14,10 +14,11 @@ pub struct Game {
     score: u8,
     high_score: u8,
     projectiles: Vec<Projectile>,
-    frame_count: usize,
+    frame_count: u64,
     rng: Pcg64,
+    pre_game: bool,
     over: bool,
-    restart: bool,
+    btn_pressed: bool,
 }
 
 impl Game {
@@ -41,9 +42,10 @@ impl Game {
             high_score,
             projectiles: Vec::new(),
             frame_count: 0,
-            rng: Pcg64::seed_from_u64(69420),
+            rng: Pcg64::seed_from_u64(0), // Temporary value
+            pre_game: true,
             over: false,
-            restart: false,
+            btn_pressed: false,
         }
     }
 
@@ -60,15 +62,19 @@ impl Game {
             }
 
             // Not using format!() here to reduce cart size
-            wasm4::text("Your score:\nHigh score:\nPress a button\nto restart", 20, 20);
+            wasm4::text(
+                "Your score:\nHigh score:\nPress a button\nto restart",
+                20,
+                20,
+            );
             wasm4::text(&self.score.to_string(), 110, 20);
             wasm4::text(&self.high_score.to_string(), 110, 28);
 
             if unsafe { *wasm4::GAMEPAD1 } == 0 {
-                if !self.restart {
-                    self.restart = true;
+                if !self.btn_pressed {
+                    self.btn_pressed = true;
                 }
-            } else if self.restart {
+            } else if self.btn_pressed {
                 *self = Game::new();
             }
 
@@ -76,6 +82,20 @@ impl Game {
         }
 
         self.frame_count += 1;
+
+        if self.pre_game {
+            wasm4::text("Press any button\nto start", 20, 20);
+            if unsafe { *wasm4::GAMEPAD1 } == 0 {
+                if !self.btn_pressed {
+                    self.btn_pressed = true;
+                }
+            } else if self.btn_pressed {
+                self.pre_game = false;
+                self.rng = Pcg64::seed_from_u64(self.frame_count);
+                self.btn_pressed = false;
+            }
+            return;
+        }
 
         self.handle_input();
 

@@ -5,7 +5,7 @@ cargo build --release
 wasm-snip --snip-rust-fmt-code --snip-rust-panicking-code -o $cart $cart
 wasm-opt -Oz -o $cart $cart
 w4 bundle \
-    --html $output-htm.html \
+    --html $output-web.html \
     --windows $output-win.exe \
     --mac $output-mac \
     --linux $output-lin \
